@@ -87,8 +87,8 @@ static int cnet_new (void)
       socks[nsocks+i].fd = -1;
       socks[nsocks+i].flags = CNET_AVAIL;
     }
+    nsocks += 4;
   }
-  nsocks += 4;
 
   memset (&socks[sid], '\0', sizeof(*socks));
   socks[sid].fd = -1;
