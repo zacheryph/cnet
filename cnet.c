@@ -71,6 +71,9 @@ static struct pollfd *pollfds = NULL;
 static int *pollsids = NULL;
 static int npollfds;
 
+static char tmp_host[40];
+static char tmp_serv[6];
+
 
 /*** private helper methods ***/
 static int cnet_new (void)
@@ -125,6 +128,7 @@ static int cnet_bind (const char *host, int port)
 
   if (-1 == (fd = socket (AF_INET, SOCK_STREAM, 0))) goto cleanup;
   if (-1 == bind (fd, sa, sizeof(*sa))) goto cleanup;
+  freeaddrinfo (res);
   return fd;
 
   cleanup:
@@ -152,7 +156,34 @@ static int cnet_register (int sid)
 /*** connection handlers ***/
 static int cnet_on_connect (int sid)
 {
+  cnet_socket_t *sock;
+  sock = &socks[sid];
+  sock->flags &= ~(CNET_CONNECT);
+
+  if (sock->handler->on_connect) sock->handler->on_connect (sid, sock->data);
   return 0;
+}
+
+static int cnet_on_newclient (int sid)
+{
+  int fd, newsid;
+  socklen_t salen;
+  cnet_socket_t *sock, *newsock;
+  struct sockaddr sa;
+  salen = sizeof(sa);
+  memset (&sa, '\0', salen);
+
+  fd = accept (sock->fd, &sa, &salen);
+  if (0 > fd) return -1;
+  newsid = cnet_new ();
+  sock = &socks[sid];
+  newsock = &socks[newsid];
+
+  getnameinfo (&sa, salen, tmp_host, 40, tmp_serv, 6, NI_NUMERICHOST|NI_NUMERICSERV);
+  newsock->rhost = strdup (tmp_host);
+  newsock->rport = atoi (tmp_serv);
+
+  return sock->handler->on_newclient (sid, sock->data, newsid, newsock->rhost, newsock->rport);
 }
 
 static int cnet_on_readable (int sid)
@@ -267,7 +298,11 @@ int cnet_select (int timeout)
     if (!p->events) continue;
 
     if (p->events & POLLIN) {
-      if (socks[sid].flags & CNET_SERVER) cnet_on_connect (sid);
+      if (socks[sid].flags & CNET_SERVER) cnet_on_newclient (sid);
+      else if (socks[sid].flags & CNET_CONNECT) {
+        cnet_on_connect (sid);
+        socks[sid].flags &= ~(CNET_CONNECT);
+      }
       else cnet_on_readable (sid);
     }
     if (p->events & POLLOUT) {

@@ -26,6 +26,7 @@ typedef struct {
   int (*on_read) (int sid, void *conn_data, char *data, int len);
   int (*on_eof) (int sid, void *conn_data, int err);
   int (*on_close) (int sid, void *conn_data);
+  int (*on_newclient) (int sid, void *conn_data, int newsid, char *host, int port);
 } cnet_handler_t;
 
 int cnet_listen (const char *host, int port);
