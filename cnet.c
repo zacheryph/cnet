@@ -367,7 +367,7 @@ int cnet_write (int sid, const char *data, int len)
   }
 
   if (sock->flags & CNET_BLOCKED) return 0;
-  len = write (sid, sock->buf, sock->len);
+  len = write (sock->fd, sock->buf, sock->len);
   if (0 > len) {
     if (errno != EAGAIN) return cnet_on_eof (sid, errno);
   }
