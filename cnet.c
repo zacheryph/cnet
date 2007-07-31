@@ -361,16 +361,9 @@ int cnet_write (int sid, const char *data, int len)
 
   /* check if there is data that still needs to be written */
   if (data) {
-    if (sock->len) {
-      sock->buf = (char *) realloc (sock->buf, sock->len + len);
-      memcpy (sock->buf + sock->len, data, len);
-      sock->len += len;
-    }
-    else {
-      sock->buf = (char *) malloc (len);
-      memcpy (sock->buf, data, len);
-      sock->len = len;
-    }
+    sock->buf = (char *)(sock->len ? realloc(sock->buf, sock->len + len) : malloc(len));
+    memcpy (sock->buf + sock->len, data, len);
+    sock->len += len;
   }
 
   if (sock->flags & CNET_BLOCKED) return 0;
