@@ -6,3 +6,4 @@
 * acl for listening sockets? (bloat?)
 * on_written callback?
 * fix cnet_write to only malloc/memcpy when needed.
+* use socket_t pointer internally to prevent lookups where possible
