@@ -195,18 +195,15 @@ static int cnet_on_readable (int sid)
   sock = &socks[sid];
   buf = calloc (1, 1024);
   if (-1 == (len = read(sock->fd, buf, 1023))) return cnet_close(sid);
-  sock->handler->on_read (sid, sock->data, buf, len);
-  return 0;
+  return sock->handler->on_read (sid, sock->data, buf, len);
 }
 
 static int cnet_on_eof (int sid, int err)
 {
-  return 0;
-}
-
-static int cnet_on_close (int sid)
-{
-  return 0;
+  cnet_socket_t *sock;
+  sock = &socks[sid];
+  cnet_close(sid);
+  return sock->handler->on_eof (sid, sock->data, err);
 }
 
 
@@ -281,7 +278,7 @@ int cnet_close (int sid)
   if (0 > sock->fd) return -1;
 
   close (sock->fd);
-  cnet_on_close (sid);
+  sock->handler->on_close (sid, sock->data);
   memset (sock, '\0', sizeof(*sock));
   sock->fd = -1;
   sock->flags = CNET_AVAIL;
