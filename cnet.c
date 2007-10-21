@@ -318,19 +318,26 @@ int cnet_select (int timeout)
   return ret;
 }
 
-cnet_handler_t *cnet_handler (int sid, cnet_handler_t *handler, void *conn_data)
+/* pass NULL to get the current handler returned */
+/* you can't 'unset' a handler, defeats the purpose of an open socket */
+cnet_handler_t *cnet_handler (int sid, cnet_handler_t *handler)
 {
   cnet_socket_t *sock;
   if (!cnet_valid(sid)) return NULL;
   sock = &socks[sid];
-  if (handler) {
+  if (handler)
     sock->handler = handler;
-    sock->data = conn_data;
-  }
-  else {
-    if (conn_data) conn_data = *(void **)sock->data;
-  }
   return sock->handler;
+}
+
+void *cnet_conndata (int sid, void *conn_data)
+{
+  cnet_socket_t *sock;
+  if (!cnet_valid(sid)) return NULL;
+  sock = &socks[sid];
+  if (conn_data)
+    sock->data = conn_data;
+  return sock->data;
 }
 
 int cnet_ip_type (const char *ip)

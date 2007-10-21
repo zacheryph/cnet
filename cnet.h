@@ -37,6 +37,7 @@ int cnet_ip_type (const char *ip);
 int cnet_valid (int sid);
 int cnet_write (int sid, const char *data, int len);
 int cnprintf (int sid, const char *format, ...);
-cnet_handler_t *cnet_handler (int sid, cnet_handler_t *handler, void *conn_data);
+cnet_handler_t *cnet_handler (int sid, cnet_handler_t *handler);
+void *cnet_conndata (int sid, void *conn_data);
 
 #endif /* _CONTEXT_NET_H_ */
