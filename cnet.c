@@ -85,7 +85,7 @@ static int cnet_new (void)
     if (socks[sid].flags & CNET_AVAIL) break;
 
   if (sid == nsocks) {
-    socks = (cnet_socket_t *) realloc (socks, (nsocks+4) * sizeof(*socks));
+    socks = realloc (socks, (nsocks+4) * sizeof(*socks));
     memset (socks+nsocks, '\0', 4*sizeof(*socks));
     for (i = 0; i < 4; i++) {
       socks[nsocks+i].fd = -1;
@@ -142,8 +142,8 @@ static int cnet_register (int sid)
   cnet_socket_t *sock;
   sock = &socks[sid];
 
-  pollfds = (struct pollfd *) realloc (pollfds, (npollfds+1) * sizeof(*pollfds));
-  pollsids = (int *) realloc (pollsids, (npollfds+1) * sizeof(*pollsids));
+  pollfds = realloc (pollfds, (npollfds+1) * sizeof(*pollfds));
+  pollsids = realloc (pollsids, (npollfds+1) * sizeof(*pollsids));
   memset (pollfds+npollfds, '\0', sizeof(*pollfds));
   pollfds[npollfds].fd = sock->fd;
   pollfds[npollfds].events = POLLIN;
@@ -376,7 +376,7 @@ int cnet_write (int sid, const char *data, int len)
 
   /* check if there is data that still needs to be written */
   if (data) {
-    sock->buf = (char *)(sock->len ? realloc(sock->buf, sock->len + len) : malloc(len));
+    sock->buf = sock->len ? realloc(sock->buf, sock->len + len) : calloc(1, len);
     memcpy (sock->buf + sock->len, data, len);
     sock->len += len;
   }
