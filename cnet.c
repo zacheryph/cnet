@@ -37,6 +37,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 #include "cnet.h"
 
 #define CNET_CLIENT   0x01
@@ -188,6 +189,13 @@ static int cnet_on_newclient (int sid)
 
 static int cnet_on_readable (int sid)
 {
+  cnet_socket_t *sock;
+  char *buf;
+  int len;
+  sock = &socks[sid];
+  buf = calloc (1, 1024);
+  if (-1 == (len = read(sock->fd, buf, 1023))) return cnet_close(sid);
+  sock->handler->on_read (sid, sock->data, buf, len);
   return 0;
 }
 
