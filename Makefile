@@ -20,7 +20,10 @@
 CC = gcc
 OBJS = cnet.o
 SRCS = cnet.c
-CFLAGS = -W -Wall -pedantic -fPIC
+CFLAGS = -W -Wall -pedantic -fPIC -g3
+TSFLAGS = -DTESTSERVER -o server test.c
+TCFLAGS = -DTESTCLIENT -o client test.c
+T_LDFLAGS = -Wno-unused-parameter -L. -lcnet
 OS := $(shell uname -s)
 ifeq ($(OS), Darwin)
 	LDFLAGS = -dynamiclib
@@ -33,8 +36,12 @@ endif
 default: $(OBJS)
 	$(CC) $(LDFLAGS) -o $(LIBNAME) $(OBJS)
 
+test: default
+	$(CC) $(CFLAGS) $(T_LDFLAGS) $(TSFLAGS)
+	$(CC) $(CFLAGS) $(T_LDFLAGS) $(TCFLAGS)
+
 clean:
-	@rm -f *.o $(LIBNAME)
+	@rm -f *.o $(LIBNAME) server client
 
 .c.o:
 	$(CC) $(CFLAGS) -c $<
