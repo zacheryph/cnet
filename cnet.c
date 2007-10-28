@@ -301,7 +301,7 @@ int cnet_select (int timeout)
   for (i = 0; n && i < npollfds; i++) {
     p = &pollfds[i];
     sid = pollsids[i];
-    if (!p->revents) continue;
+    if (!socks[sid].handler || !p->revents) continue;
 
     if (p->revents & POLLIN) {
       p->events &= POLLIN;

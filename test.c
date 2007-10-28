@@ -20,7 +20,9 @@
  */
 #include <errno.h>
 #include <stdio.h>
-#include "cnet.h"
+#include <string.h>
+#include <unistd.h>
+#include "cnet.c"
 
 #define TESTSERVER_HOST "127.0.0.1"
 #define TESTSERVER_PORT 64930
@@ -73,8 +75,10 @@ int main (const int argc, const char **argv)
   cnet_handler (ssid, &testserver_handler);
   printf ("SERVER: started server sid:%d\n", ssid);
 
-  while (1)
-    cnet_select (5);
+  for (;;) {
+    printf ("SERVER: calling cnet_select()\n");
+    cnet_select (5000);
+  }
 
   return 0;
 }
@@ -85,25 +89,25 @@ int main (const int argc, const char **argv)
 #ifdef TESTCLIENT
 int tc_on_connect (int sid, void *conn_data)
 {
-
+  printf ("CLIENT: on_connect sid:%d\n", sid);
   return 0;
 }
 
 int tc_on_read (int sid, void *conn_data, char *data, int len)
 {
-
+  printf ("CLIENT: on_read sid:%d len:%d --> %s\n", sid, len, data);
   return 0;
 }
 
 int tc_on_eof (int sid, void *conn_data, int err)
 {
-
+  printf ("CLIENT: on_eof sid:%d\n", sid);
   return 0;
 }
 
 int tc_on_close (int sid, void *conn_data)
 {
-
+  printf ("CLIENT: on_close sid:%d\n", sid);
   return 0;
 }
 
@@ -113,6 +117,21 @@ cnet_handler_t testclient_handler = {
 
 int main (const int argc, const char **argv)
 {
+  int i, sid;
+
+  sid = cnet_connect (TESTSERVER_HOST, TESTSERVER_PORT, NULL, 0);
+  cnet_handler (sid, &testclient_handler);
+  if (0 > sid) {
+    printf ("CLIENT: ERROR cnet_connect failed: %d\n", sid);
+    printf ("perror: %s\n", strerror(errno));
+    return 0;
+  }
+
+  for (i = 0; i < 4; i++) {
+    cnprintf (sid, "my formatted: %d --> %s\n", i, "Format String");
+    cnet_select(2000);
+    sleep (2);
+  }
 
   return 0;
 }
