@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include "cnet.c"
+#include "cnet.h"
 
 #define TESTSERVER_HOST "127.0.0.1"
 #define TESTSERVER_PORT 64930
