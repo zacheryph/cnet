@@ -173,11 +173,11 @@ static int cnet_on_newclient (int sid)
   struct sockaddr sa;
   salen = sizeof(sa);
   memset (&sa, '\0', salen);
+  sock = &socks[sid];
 
   fd = accept (sock->fd, &sa, &salen);
   if (0 > fd) return -1;
   newsid = cnet_new ();
-  sock = &socks[sid];
   newsock = &socks[newsid];
 
   getnameinfo (&sa, salen, tmp_host, 40, tmp_serv, 6, NI_NUMERICHOST|NI_NUMERICSERV);
