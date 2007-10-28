@@ -19,10 +19,6 @@
  * THE SOFTWARE.
  */
 /* stupid linux & gnu */
-#if defined(__linux__)
-# define _GNU_SOURCE
-#endif
-
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
@@ -39,6 +35,8 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include "cnet.h"
+
+#define _GNU_SOURCE
 
 #define CNET_CLIENT   0x01
 #define CNET_SERVER   0x02
