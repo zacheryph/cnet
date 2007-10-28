@@ -146,7 +146,7 @@ static int cnet_register (int sid)
   pollsids = realloc (pollsids, (npollfds+1) * sizeof(*pollsids));
   memset (pollfds+npollfds, '\0', sizeof(*pollfds));
   pollfds[npollfds].fd = sock->fd;
-  pollfds[npollfds].events = POLLIN;
+  pollfds[npollfds].events = POLLIN | POLLOUT | POLLERR | POLLHUP | POLLNVAL;
   pollsids[npollfds] = sid;
   npollfds++;
 
@@ -179,6 +179,8 @@ static int cnet_on_newclient (int sid)
   if (0 > fd) return -1;
   newsid = cnet_new ();
   newsock = &socks[newsid];
+  newsock->fd = fd;
+  cnet_register (newsid);
 
   getnameinfo (&sa, salen, tmp_host, 40, tmp_serv, 6, NI_NUMERICHOST|NI_NUMERICSERV);
   newsock->rhost = strdup (tmp_host);
@@ -202,8 +204,8 @@ static int cnet_on_eof (int sid, int err)
 {
   cnet_socket_t *sock;
   sock = &socks[sid];
-  cnet_close(sid);
-  return sock->handler->on_eof (sid, sock->data, err);
+  if (sock->handler->on_eof) sock->handler->on_eof (sid, sock->data, err);
+  return cnet_close(sid);
 }
 
 
@@ -259,7 +261,7 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
     salen = res->ai_addrlen;
   }
 
-  if (-1 == (connect (sock->fd, sa, sizeof(*sa)))) goto cleanup;
+  connect (sock->fd, sa, sizeof(*sa));
   cnet_register (sid);
   sock->flags = CNET_CLIENT|CNET_CONNECT;
   return sid;
@@ -278,9 +280,8 @@ int cnet_close (int sid)
   if (0 > sock->fd) return -1;
 
   close (sock->fd);
-  sock->handler->on_close (sid, sock->data);
+  if (sock->handler->on_close) sock->handler->on_close (sid, sock->data);
   memset (sock, '\0', sizeof(*sock));
-  sock->fd = -1;
   sock->flags = CNET_AVAIL;
   return 0;
 }
@@ -300,9 +301,10 @@ int cnet_select (int timeout)
   for (i = 0; n && i < npollfds; i++) {
     p = &pollfds[i];
     sid = pollsids[i];
-    if (!p->events) continue;
+    if (!p->revents) continue;
 
-    if (p->events & POLLIN) {
+    if (p->revents & POLLIN) {
+      p->events &= POLLIN;
       if (socks[sid].flags & CNET_SERVER) cnet_on_newclient (sid);
       else if (socks[sid].flags & CNET_CONNECT) {
         cnet_on_connect (sid);
@@ -310,11 +312,12 @@ int cnet_select (int timeout)
       }
       else cnet_on_readable (sid);
     }
-    if (p->events & POLLOUT) {
+    if (p->revents & POLLOUT) {
+      p->events &= POLLOUT;
       socks[sid].flags &= ~(CNET_BLOCKED);
       cnet_write (sid, NULL, 0);
     }
-    if (p->events & (POLLERR|POLLHUP|POLLNVAL)) {
+    if (p->revents & (POLLERR|POLLHUP|POLLNVAL)) {
       cnet_on_eof (sid, 0);
     }
     n--;
@@ -413,7 +416,6 @@ int cnprintf (int sid, const char *format, ...)
   va_start (args, format);
   if (-1 == (len = vasprintf (&data, format, args))) return -1;
   va_end (args);
-
   ret = cnet_write (sid, data, len);
   free (data);
   return ret;
