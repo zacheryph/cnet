@@ -20,6 +20,7 @@
  */
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include "cnet.h"
@@ -41,6 +42,7 @@ cnet_handler_t testserver_handler = {
 int ts_on_read (int sid, void *conn_data, char *data, int len)
 {
   printf ("SERVER: on_read sid:%d len:%d --> %s\n", sid, len, data);
+  cnprintf (sid, "From SERVER: Got your Message !\n");
   return 0;
 }
 
@@ -108,7 +110,7 @@ int tc_on_eof (int sid, void *conn_data, int err)
 int tc_on_close (int sid, void *conn_data)
 {
   printf ("CLIENT: on_close sid:%d\n", sid);
-  return 0;
+  exit(0);
 }
 
 cnet_handler_t testclient_handler = {
@@ -132,6 +134,7 @@ int main (const int argc, const char **argv)
     cnet_select(2000);
     sleep (2);
   }
+  cnet_close (sid);
 
   return 0;
 }
