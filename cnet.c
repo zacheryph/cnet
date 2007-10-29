@@ -178,6 +178,7 @@ static int cnet_on_newclient (int sid)
   newsid = cnet_new ();
   newsock = &socks[newsid];
   newsock->fd = fd;
+  newsock->flags = CNET_CLIENT;
   cnet_register (newsid, POLLIN|POLLERR|POLLHUP|POLLNVAL);
 
   getnameinfo (&sa, salen, tmp_host, 40, tmp_serv, 6, NI_NUMERICHOST|NI_NUMERICSERV);
@@ -301,6 +302,7 @@ int cnet_select (int timeout)
   static int active = 0;
   int i, n, ret, sid;
   struct pollfd *p;
+  cnet_socket_t *sock;
   if (active) return 0;
   active++;
 
@@ -311,25 +313,28 @@ int cnet_select (int timeout)
   for (i = 0; n && i < npollfds; i++) {
     p = &pollfds[i];
     sid = pollsids[i];
-    if (!socks[sid].handler || !p->revents) continue;
+    sock = &socks[sid];
+    if (!sock->handler || !p->revents) continue;
+
+    if (p->revents & (POLLERR|POLLHUP|POLLNVAL)) {
+      cnet_on_eof (sid, 0);
+      i--;
+      n--;
+      continue;
+    }
 
     if (p->revents & POLLIN) {
       p->events &= POLLIN;
-      if (socks[sid].flags & CNET_SERVER) cnet_on_newclient (sid);
-      else if (socks[sid].flags & CNET_CONNECT) {
-        cnet_on_connect (sid);
-        socks[sid].flags &= ~(CNET_CONNECT);
-      }
+      if (sock->flags & CNET_SERVER) cnet_on_newclient (sid);
       else cnet_on_readable (sid);
     }
     if (p->revents & POLLOUT) {
-      p->events &= POLLOUT;
-      socks[sid].flags &= ~(CNET_BLOCKED);
+      if (socks->flags & CNET_CONNECT) cnet_on_connect (sid);
       cnet_write (sid, NULL, 0);
+      socks->flags &= ~(CNET_BLOCKED|CNET_CONNECT);
     }
-    if (p->revents & (POLLERR|POLLHUP|POLLNVAL)) {
-      cnet_on_eof (sid, 0);
-    }
+
+    p->events |= (POLLIN|POLLERR|POLLHUP|POLLNVAL);
     n--;
   }
   active--;
@@ -391,11 +396,9 @@ int cnet_write (int sid, const char *data, int len)
     sock->len += len;
   }
 
-  if (sock->flags & CNET_BLOCKED) return 0;
+  if (sock->flags & (CNET_BLOCKED|CNET_CONNECT)) return 0;
   len = write (sock->fd, sock->buf, sock->len);
-  if (0 > len) {
-    if (errno != EAGAIN) return cnet_on_eof (sid, errno);
-  }
+  if (0 > len && errno != EAGAIN) return cnet_on_eof (sid, errno);
 
   if (len == sock->len) {
     free (sock->buf);
