@@ -135,7 +135,7 @@ static int cnet_bind (const char *host, int port)
     return -1;
 }
 
-static int cnet_register (int sid)
+static int cnet_register (int sid, int flags)
 {
   cnet_socket_t *sock;
   sock = &socks[sid];
@@ -144,7 +144,7 @@ static int cnet_register (int sid)
   pollsids = realloc (pollsids, (npollfds+1) * sizeof(*pollsids));
   memset (pollfds+npollfds, '\0', sizeof(*pollfds));
   pollfds[npollfds].fd = sock->fd;
-  pollfds[npollfds].events = POLLIN | POLLOUT | POLLERR | POLLHUP | POLLNVAL;
+  pollfds[npollfds].events = flags;
   pollsids[npollfds] = sid;
   npollfds++;
 
@@ -178,7 +178,7 @@ static int cnet_on_newclient (int sid)
   newsid = cnet_new ();
   newsock = &socks[newsid];
   newsock->fd = fd;
-  cnet_register (newsid);
+  cnet_register (newsid, POLLIN|POLLERR|POLLHUP|POLLNVAL);
 
   getnameinfo (&sa, salen, tmp_host, 40, tmp_serv, 6, NI_NUMERICHOST|NI_NUMERICSERV);
   newsock->rhost = strdup (tmp_host);
@@ -219,7 +219,7 @@ int cnet_listen (const char *host, int port)
   cnet_set_nonblock (sid);
   if (-1 == listen (sock->fd, 2)) goto cleanup;
   sock->flags = CNET_SERVER;
-  cnet_register (sid);
+  cnet_register (sid, POLLIN|POLLERR|POLLHUP|POLLNVAL);
   return sid;
 
   cleanup:
@@ -229,7 +229,7 @@ int cnet_listen (const char *host, int port)
 
 int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
 {
-  int salen, sid;
+  int salen, sid, ret;
   char port[6];
   cnet_socket_t *sock;
   struct sockaddr *sa;
@@ -254,13 +254,12 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
 
   snprintf (port, 6, "%d", rport);
   if (getaddrinfo (rhost, port, &hints, &res)) goto cleanup;
-  else {
-    sa = res->ai_addr;
-    salen = res->ai_addrlen;
-  }
+  sa = res->ai_addr;
+  salen = res->ai_addrlen;
 
-  connect (sock->fd, sa, sizeof(*sa));
-  cnet_register (sid);
+  ret = connect (sock->fd, sa, sizeof(*sa));
+  if (-1 == ret && EINPROGRESS != errno) goto cleanup;
+  cnet_register (sid, POLLOUT|POLLERR|POLLHUP|POLLNVAL);
   sock->flags = CNET_CLIENT|CNET_CONNECT;
   return sid;
 
@@ -272,10 +271,23 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
 
 int cnet_close (int sid)
 {
+  int i;
   cnet_socket_t *sock;
   if (!cnet_valid(sid)) return -1;
   sock = &socks[sid];
   if (0 > sock->fd) return -1;
+
+  /* remove socket from pollfds is wise.... */
+  for (i = 0; i < npollfds; i++)
+    if (sock->fd == pollfds[i].fd) break;
+  npollfds--;
+  if (i < npollfds) {
+    memcpy (&pollfds[i], &pollfds[npollfds], sizeof(*pollfds));
+    pollsids[i] = pollsids[npollfds];
+  }
+  pollfds = realloc (pollfds, npollfds * sizeof(*pollfds));
+  pollsids = realloc (pollsids, npollfds * sizeof(*pollsids));
+
 
   close (sock->fd);
   if (sock->handler->on_close) sock->handler->on_close (sid, sock->data);
