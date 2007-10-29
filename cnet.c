@@ -91,9 +91,6 @@ static int cnet_new (void)
     }
     nsocks += 4;
   }
-
-  memset (&socks[sid], '\0', sizeof(*socks));
-  socks[sid].fd = -1;
   return sid;
 }
 
@@ -293,6 +290,7 @@ int cnet_close (int sid)
   close (sock->fd);
   if (sock->handler->on_close) sock->handler->on_close (sid, sock->data);
   memset (sock, '\0', sizeof(*sock));
+  sock->fd = -1;
   sock->flags = CNET_AVAIL;
   return 0;
 }
