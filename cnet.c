@@ -117,10 +117,8 @@ static int cnet_bind (const char *host, int port)
   if (cnet_ip_type(host)) hints.ai_flags = AI_NUMERICHOST;
   if (port) snprintf (strport, 6, "%d", port);
   if (getaddrinfo (host, (port ? strport : NULL), &hints, &res)) return -1;
-  else {
-    sa = res->ai_addr;
-    salen = res->ai_addrlen;
-  }
+  sa = res->ai_addr;
+  salen = res->ai_addrlen;
 
   if (-1 == (fd = socket (AF_INET, SOCK_STREAM, 0))) goto cleanup;
   if (-1 == bind (fd, sa, sizeof(*sa))) goto cleanup;
@@ -211,7 +209,7 @@ int cnet_listen (const char *host, int port)
   int sid;
   cnet_socket_t *sock;
 
-  sid = cnet_new ();
+  if (-1 == (sid = cnet_new ())) return -1;
   sock = &socks[sid];
   if (-1 == (sock->fd = cnet_bind (host, port))) return -1;
   cnet_set_nonblock (sid);
@@ -234,7 +232,7 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
   struct addrinfo hints;
   struct addrinfo *res = NULL;
 
-  sid = cnet_new ();
+  if (-1 == (sid = cnet_new ())) return -1;
   sock = &socks[sid];
   memset (&hints, '\0', sizeof(hints));
   hints.ai_family = PF_UNSPEC;
