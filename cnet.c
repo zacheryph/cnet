@@ -229,8 +229,7 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
   char port[6];
   cnet_socket_t *sock;
   struct sockaddr *sa;
-  struct addrinfo hints;
-  struct addrinfo *res = NULL;
+  struct addrinfo hints, *res = NULL;
 
   if (-1 == (sid = cnet_new ())) return -1;
   sock = &socks[sid];
