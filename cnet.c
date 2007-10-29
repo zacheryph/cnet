@@ -109,8 +109,7 @@ static int cnet_bind (const char *host, int port)
   int salen, fd;
   char strport[6];
   struct sockaddr *sa;
-  struct addrinfo hints;
-  struct addrinfo *res = NULL;
+  struct addrinfo hints, *res = NULL;
 
   memset (&hints, '\0', sizeof(hints));
   hints.ai_family = PF_UNSPEC;
@@ -319,18 +318,19 @@ int cnet_select (int timeout)
     }
 
     if (p->revents & POLLIN) {
-      p->events &= POLLIN;
       if (sock->flags & CNET_SERVER) cnet_on_newclient (sid);
       else cnet_on_readable (sid);
     }
     if (p->revents & POLLOUT) {
-      if (socks->flags & CNET_CONNECT) cnet_on_connect (sid);
-      cnet_write (sid, NULL, 0);
-      socks->flags &= ~(CNET_BLOCKED|CNET_CONNECT);
+      if (sock->flags & CNET_CONNECT) {
+        cnet_on_connect (sid);
+        socks->flags &= ~CNET_BLOCKED;
+      }
+      if (sock->flags & CNET_BLOCKED) cnet_write (sid, NULL, 0);
     }
 
-    p->events |= (POLLIN|POLLERR|POLLHUP|POLLNVAL);
     n--;
+    if (!n) break;
   }
   active--;
   return ret;
@@ -395,9 +395,13 @@ int cnet_write (int sid, const char *data, int len)
   len = write (sock->fd, sock->buf, sock->len);
   if (0 > len && errno != EAGAIN) return cnet_on_eof (sid, errno);
 
+  for (i = 0; i < npollfds; i++)
+    if (sock->fd == pollfds[i].fd) break;
+
   if (len == sock->len) {
     free (sock->buf);
     sock->len = 0;
+    pollfds[i].events &= ~POLLOUT;
   }
   else {
     memmove (sock->buf, sock->buf+len, sock->len-len);
@@ -406,11 +410,7 @@ int cnet_write (int sid, const char *data, int len)
 
     /* we need to set block since we still have data */
     sock->flags |= CNET_BLOCKED;
-    for (i = 0; i < npollfds; i++) {
-      if (pollfds[i].fd != sock->fd) continue;
-      pollfds[i].events |= POLLOUT;
-      break;
-    }
+    pollfds[i].events |= POLLOUT;
   }
   return len;
 }
