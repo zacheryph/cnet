@@ -343,8 +343,7 @@ cnet_handler_t *cnet_handler (int sid, cnet_handler_t *handler)
   cnet_socket_t *sock;
   if (!cnet_valid(sid)) return NULL;
   sock = &socks[sid];
-  if (handler)
-    sock->handler = handler;
+  if (handler) sock->handler = handler;
   return sock->handler;
 }
 
@@ -353,8 +352,7 @@ void *cnet_conndata (int sid, void *conn_data)
   cnet_socket_t *sock;
   if (!cnet_valid(sid)) return NULL;
   sock = &socks[sid];
-  if (conn_data)
-    sock->data = conn_data;
+  if (conn_data) sock->data = conn_data;
   return sock->data;
 }
 
@@ -380,12 +378,11 @@ int cnet_write (int sid, const char *data, int len)
   int i;
   cnet_socket_t *sock;
   if (!cnet_valid(sid)) return -1;
+  if (0 >= len || !sock->len) return 0;
   sock = &socks[sid];
-  if (data && 0 > len) len = strlen (data);
-  if (!len && !sock->len) return 0;
 
   /* check if there is data that still needs to be written */
-  if (data) {
+  if (len > 0) {
     sock->buf = sock->len ? realloc(sock->buf, sock->len + len) : calloc(1, len);
     memcpy (sock->buf + sock->len, data, len);
     sock->len += len;
