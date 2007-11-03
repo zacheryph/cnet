@@ -70,9 +70,6 @@ static struct pollfd *pollfds = NULL;
 static int *pollsids = NULL;
 static int npollfds;
 
-static char tmp_host[40];
-static char tmp_serv[6];
-
 
 /*** private helper methods ***/
 static int cnet_new (void)
@@ -160,6 +157,7 @@ static int cnet_on_connect (int sid)
 static int cnet_on_newclient (int sid)
 {
   int fd, newsid;
+  char host[40], serv[6];
   socklen_t salen;
   cnet_socket_t *sock, *newsock;
   struct sockaddr sa;
@@ -170,14 +168,15 @@ static int cnet_on_newclient (int sid)
   fd = accept (sock->fd, &sa, &salen);
   if (0 > fd) return -1;
   newsid = cnet_new ();
+  sock = &socks[sid];
   newsock = &socks[newsid];
   newsock->fd = fd;
   newsock->flags = CNET_CLIENT;
   cnet_register (newsid, POLLIN|POLLERR|POLLHUP|POLLNVAL);
 
-  getnameinfo (&sa, salen, tmp_host, 40, tmp_serv, 6, NI_NUMERICHOST|NI_NUMERICSERV);
-  newsock->rhost = strdup (tmp_host);
-  newsock->rport = atoi (tmp_serv);
+  getnameinfo (&sa, salen, host, 40, serv, 6, NI_NUMERICHOST|NI_NUMERICSERV);
+  newsock->rhost = strdup (host);
+  newsock->rport = atoi (serv);
 
   return sock->handler->on_newclient (sid, sock->data, newsid, newsock->rhost, newsock->rport);
 }
@@ -186,11 +185,13 @@ static int cnet_on_readable (int sid)
 {
   cnet_socket_t *sock;
   char *buf;
-  int len;
+  int len, ret;
   sock = &socks[sid];
   buf = calloc (1, 1024);
   if (-1 == (len = read(sock->fd, buf, 1023))) return cnet_close(sid);
-  return sock->handler->on_read (sid, sock->data, buf, len);
+  ret = sock->handler->on_read (sid, sock->data, buf, len);
+  free (buf);
+  return ret;
 }
 
 static int cnet_on_eof (int sid, int err)
@@ -253,7 +254,7 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
 
   ret = connect (sock->fd, sa, sizeof(*sa));
   if (-1 == ret && EINPROGRESS != errno) goto cleanup;
-  cnet_register (sid, POLLOUT|POLLERR|POLLHUP|POLLNVAL);
+  cnet_register (sid, POLLIN|POLLOUT|POLLERR|POLLHUP|POLLNVAL);
   sock->flags = CNET_CLIENT|CNET_CONNECT;
   return sid;
 
@@ -285,6 +286,9 @@ int cnet_close (int sid)
 
   close (sock->fd);
   if (sock->handler->on_close) sock->handler->on_close (sid, sock->data);
+  free (sock->lhost);
+  free (sock->rhost);
+  if (sock->len) free (sock->buf);
   memset (sock, '\0', sizeof(*sock));
   sock->fd = -1;
   sock->flags = CNET_AVAIL;
@@ -322,6 +326,7 @@ int cnet_select (int timeout)
       else cnet_on_readable (sid);
     }
     if (p->revents & POLLOUT) {
+      p->events &= ~(POLLOUT);
       if (sock->flags & CNET_CONNECT) {
         cnet_on_connect (sid);
         socks->flags &= ~CNET_BLOCKED;
@@ -378,8 +383,8 @@ int cnet_write (int sid, const char *data, int len)
   int i;
   cnet_socket_t *sock;
   if (!cnet_valid(sid)) return -1;
-  if (0 >= len || !sock->len) return 0;
   sock = &socks[sid];
+  if (0 >= len && !sock->len) return 0;
 
   /* check if there is data that still needs to be written */
   if (len > 0) {
