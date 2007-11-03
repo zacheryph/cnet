@@ -71,10 +71,12 @@ int main (const int argc, const char **argv)
   ssid = cnet_listen (TESTSERVER_HOST, TESTSERVER_PORT);
   if (-1 == ssid) {
     printf ("SERVER: ERROR failed to connect errno:%d\n", errno);
+    printf ("SERVER: %s\n", strerror(errno));
     return errno;
   }
 
   cnet_handler (ssid, &testserver_handler);
+  printf ("SERVER: OUR PID: %d\n", getpid());
   printf ("SERVER: started server sid:%d\n", ssid);
 
   for (;;) {

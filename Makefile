@@ -40,6 +40,9 @@ test: default
 	$(CC) $(CFLAGS) $(T_LDFLAGS) $(TSFLAGS)
 	$(CC) $(CFLAGS) $(T_LDFLAGS) $(TCFLAGS)
 
+runtest: test
+	MallocGaurdEdges=1 MallocStackLogging=1 MallocPreScribble=1 MallocScribble=1 MallocErrorAbort=1 gdb ./server
+
 clean:
 	@rm -f *.o $(LIBNAME) server client
 
