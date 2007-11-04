@@ -3,3 +3,5 @@ libcnet.so
 libcnet.dylib
 server
 client
+client.dSYM
+server.dSYM
