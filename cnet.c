@@ -18,7 +18,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-/* stupid linux & gnu */
+/* this define is for gnu/linux retardation! */
+#define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
@@ -35,8 +36,6 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include "cnet.h"
-
-#define _GNU_SOURCE
 
 #define CNET_CLIENT   0x01
 #define CNET_SERVER   0x02
