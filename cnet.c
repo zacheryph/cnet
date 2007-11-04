@@ -324,6 +324,7 @@ int cnet_select (int timeout)
     if (p->revents & POLLIN) {
       if (sock->flags & CNET_SERVER) cnet_on_newclient (sid);
       else cnet_on_readable (sid);
+      sock = &socks[sid];
     }
     if (p->revents & POLLOUT) {
       p->events &= ~(POLLOUT);
