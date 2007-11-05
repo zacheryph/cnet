@@ -169,7 +169,7 @@ static int cnet_on_connect (int sid, cnet_socket_t *sock)
 
 static int cnet_on_newclient (int sid, cnet_socket_t *sock)
 {
-  int fd, newsid;
+  int fd, newsid, accepted = 0;
   char host[40], serv[6];
   socklen_t salen;
   cnet_socket_t *newsock;
@@ -180,6 +180,7 @@ static int cnet_on_newclient (int sid, cnet_socket_t *sock)
   while (navailsocks) {
     fd = accept (sock->fd, &sa, &salen);
     if (0 > fd) break;
+    accepted++;
     newsid = cnet_new ();
     newsock = &socks[newsid];
     newsock->fd = fd;
@@ -189,9 +190,10 @@ static int cnet_on_newclient (int sid, cnet_socket_t *sock)
     getnameinfo (&sa, salen, host, 40, serv, 6, NI_NUMERICHOST|NI_NUMERICSERV);
     newsock->rhost = strdup (host);
     newsock->rport = atoi (serv);
+    sock->handler->on_newclient (sid, sock->data, newsid, newsock->rhost, newsock->rport);
   }
 
-  return sock->handler->on_newclient (sid, sock->data, newsid, newsock->rhost, newsock->rport);
+  return accepted;
 }
 
 static int cnet_on_readable (int sid, cnet_socket_t *sock)
