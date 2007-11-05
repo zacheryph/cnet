@@ -137,11 +137,8 @@ static int cnet_bind (const char *host, int port)
     return -1;
 }
 
-static int cnet_register (int sid, int flags)
+static int cnet_register (int sid, cnet_socket_t *sock, int flags)
 {
-  cnet_socket_t *sock;
-  sock = &socks[sid];
-
   pollfds = realloc (pollfds, (npollfds+1) * sizeof(*pollfds));
   pollsids = realloc (pollsids, (npollfds+1) * sizeof(*pollsids));
   memset (pollfds+npollfds, '\0', sizeof(*pollfds));
@@ -186,7 +183,7 @@ static int cnet_on_newclient (int sid, cnet_socket_t *sock)
   newsock = &socks[newsid];
   newsock->fd = fd;
   newsock->flags = CNET_CLIENT;
-  cnet_register (newsid, POLLIN|POLLERR|POLLHUP|POLLNVAL);
+  cnet_register (newsid, newsock, POLLIN|POLLERR|POLLHUP|POLLNVAL);
 
   getnameinfo (&sa, salen, host, 40, serv, 6, NI_NUMERICHOST|NI_NUMERICSERV);
   newsock->rhost = strdup (host);
@@ -225,7 +222,7 @@ int cnet_listen (const char *host, int port)
   cnet_set_nonblock (sid);
   if (-1 == listen (sock->fd, 2)) goto cleanup;
   sock->flags = CNET_SERVER;
-  cnet_register (sid, POLLIN|POLLERR|POLLHUP|POLLNVAL);
+  cnet_register (sid, sock, POLLIN|POLLERR|POLLHUP|POLLNVAL);
   return sid;
 
   cleanup:
@@ -264,7 +261,7 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
 
   ret = connect (sock->fd, sa, sizeof(*sa));
   if (-1 == ret && EINPROGRESS != errno) goto cleanup;
-  cnet_register (sid, POLLIN|POLLOUT|POLLERR|POLLHUP|POLLNVAL);
+  cnet_register (sid, sock, POLLIN|POLLOUT|POLLERR|POLLHUP|POLLNVAL);
   sock->flags = CNET_CLIENT|CNET_CONNECT;
   return sid;
 
