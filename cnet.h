@@ -18,8 +18,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#ifndef _H_CONTEXT_NET_
-#define _H_CONTEXT_NET_
+#ifndef CONTEXT_NET_H_
+#define CONTEXT_NET_H_
 
 typedef struct {
   int (*on_connect) (int sid, void *conn_data);
@@ -40,4 +40,4 @@ int cnprintf (int sid, const char *format, ...);
 cnet_handler_t *cnet_handler (int sid, cnet_handler_t *handler);
 void *cnet_conndata (int sid, void *conn_data);
 
-#endif /* _H_CONTEXT_NET_ */
+#endif /* CONTEXT_NET_H_ */
