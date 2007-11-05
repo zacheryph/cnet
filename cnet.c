@@ -88,29 +88,6 @@ static int cnet_grow_sockets (void)
   return newsocks;
 }
 
-static int cnet_new (void)
-{
-  int sid;
-
-  if (0 == nsocks) cnet_grow_sockets();
-  for (sid = 0; sid < nsocks; sid++)
-    if (socks[sid].flags & CNET_AVAIL) break;
-
-  if (sid == nsocks) return -1;
-
-  navailsocks--;
-  return sid;
-}
-
-static int cnet_set_nonblock (cnet_socket_t *sock)
-{
-  int flags;
-  if (-1 == (flags = fcntl (sock->fd, F_GETFL, 0))) return -1;
-  flags |= O_NONBLOCK;
-  fcntl (sock->fd, F_SETFL, flags);
-  return 0;
-}
-
 /* returns fd. NOT sid */
 static int cnet_bind (const char *host, int port)
 {
@@ -118,6 +95,9 @@ static int cnet_bind (const char *host, int port)
   char strport[6];
   struct sockaddr *sa;
   struct addrinfo hints, *res = NULL;
+
+  fd = socket (AF_INET, SOCK_STREAM, 0);
+  if (!host || 0 > fd) return fd;
 
   memset (&hints, '\0', sizeof(hints));
   hints.ai_family = PF_UNSPEC;
@@ -127,27 +107,46 @@ static int cnet_bind (const char *host, int port)
   sa = res->ai_addr;
   salen = res->ai_addrlen;
 
-  if (-1 == (fd = socket (AF_INET, SOCK_STREAM, 0))) goto cleanup;
-  if (-1 == bind (fd, sa, sizeof(*sa))) goto cleanup;
+  if (-1 == bind (fd, sa, sizeof(*sa))) {
+    close (fd);
+    fd = -1;
+  }
+
   freeaddrinfo (res);
   return fd;
-
-  cleanup:
-    freeaddrinfo (res);
-    return -1;
 }
 
-static int cnet_register (int sid, cnet_socket_t *sock, int flags)
+/* create a sid / configure fd */
+static int cnet_register (int fd, int sockflags, int fdflags)
 {
+  int sid, flags;
+  cnet_socket_t *sock;
+
+  /* get us our sid */
+  if (0 == nsocks) cnet_grow_sockets();
+  for (sid = 0; sid < nsocks; sid++)
+    if (socks[sid].flags & CNET_AVAIL) break;
+  if (sid == nsocks) return -1;
+  navailsocks--;
+  sock = &socks[sid];
+  sock->fd = fd;
+  sock->flags = sockflags;
+
+  /* configure the fd */
   pollfds = realloc (pollfds, (npollfds+1) * sizeof(*pollfds));
   pollsids = realloc (pollsids, (npollfds+1) * sizeof(*pollsids));
   memset (pollfds+npollfds, '\0', sizeof(*pollfds));
   pollfds[npollfds].fd = sock->fd;
-  pollfds[npollfds].events = flags;
+  pollfds[npollfds].events = fdflags;
   pollsids[npollfds] = sid;
   npollfds++;
 
-  return 0;
+  /* set nonblocking */
+  if (-1 == (flags = fcntl (sock->fd, F_GETFL, 0))) return -1;
+  flags |= O_NONBLOCK;
+  fcntl (sock->fd, F_SETFL, flags);
+
+  return sid;
 }
 
 /* fetch the cnet_socket_t related to a sid if avail and not deleted */
@@ -181,18 +180,14 @@ static int cnet_on_newclient (int sid, cnet_socket_t *sock)
     fd = accept (sock->fd, &sa, &salen);
     if (0 > fd) break;
     accepted++;
-    newsid = cnet_new ();
+    newsid = cnet_register (fd, CNET_CLIENT, POLLIN|POLLERR|POLLHUP|POLLNVAL);
     newsock = &socks[newsid];
-    newsock->fd = fd;
-    newsock->flags = CNET_CLIENT;
-    cnet_register (newsid, newsock, POLLIN|POLLERR|POLLHUP|POLLNVAL);
 
     getnameinfo (&sa, salen, host, 40, serv, 6, NI_NUMERICHOST|NI_NUMERICSERV);
     newsock->rhost = strdup (host);
     newsock->rport = atoi (serv);
     sock->handler->on_newclient (sid, sock->data, newsid, newsock->rhost, newsock->rport);
   }
-
   return accepted;
 }
 
@@ -217,60 +212,44 @@ static int cnet_on_eof (int sid, cnet_socket_t *sock, int err)
 /*** public functions ***/
 int cnet_listen (const char *host, int port)
 {
-  int sid;
-  cnet_socket_t *sock;
+  int fd;
 
-  if (-1 == (sid = cnet_new ())) return -1;
-  sock = &socks[sid];
-  if (-1 == (sock->fd = cnet_bind (host, port))) return -1;
-  cnet_set_nonblock (sock);
-  if (-1 == listen (sock->fd, 2)) goto cleanup;
-  sock->flags = CNET_SERVER;
-  cnet_register (sid, sock, POLLIN|POLLERR|POLLHUP|POLLNVAL);
-  return sid;
-
-  cleanup:
-    cnet_close (sid);
+  if (-1 == (fd = cnet_bind (host, port))) return -1;
+  if (-1 == listen (fd, 2)) {
+    close (fd);
     return -1;
+  }
+  return cnet_register (fd, CNET_SERVER, POLLIN|POLLERR|POLLHUP|POLLNVAL);
 }
 
 int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
 {
-  int salen, sid, ret;
+  int salen, fd, ret;
   char port[6];
-  cnet_socket_t *sock;
   struct sockaddr *sa;
   struct addrinfo hints, *res = NULL;
 
-  if (-1 == (sid = cnet_new ())) return -1;
-  sock = &socks[sid];
   memset (&hints, '\0', sizeof(hints));
   hints.ai_family = PF_UNSPEC;
+  if (-1 == (fd = cnet_bind (lhost, lport))) return -1;
 
-  if (!lhost) {
-    if (-1 == (sock->fd = socket (AF_INET, SOCK_STREAM, 0))) return -1;
-  }
-  else {
-    if (-1 == (sock->fd = cnet_bind (lhost, lport))) return -1;
-    /* now we need to get the socket family to hint the connect() */
-    getsockname (sock->fd, sa, NULL);
+  /* if we have lhost we need to get hints for connect */
+  if (lhost) {
+    getsockname (fd, sa, NULL);
     hints.ai_family = sa->sa_family;
   }
-  cnet_set_nonblock (sock);
 
   snprintf (port, 6, "%d", rport);
   if (getaddrinfo (rhost, port, &hints, &res)) goto cleanup;
   sa = res->ai_addr;
   salen = res->ai_addrlen;
 
-  ret = connect (sock->fd, sa, sizeof(*sa));
+  ret = connect (fd, sa, sizeof(*sa));
   if (-1 == ret && EINPROGRESS != errno) goto cleanup;
-  cnet_register (sid, sock, POLLIN|POLLOUT|POLLERR|POLLHUP|POLLNVAL);
-  sock->flags = CNET_CLIENT|CNET_CONNECT;
-  return sid;
+  return cnet_register (fd, CNET_CLIENT|CNET_CONNECT, POLLIN|POLLOUT|POLLERR|POLLHUP|POLLNVAL);
 
   cleanup:
-    cnet_close (sid);
+    close (fd);
     if (res) freeaddrinfo (res);
     return -1;
 }
