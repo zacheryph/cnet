@@ -177,17 +177,19 @@ static int cnet_on_newclient (int sid, cnet_socket_t *sock)
   salen = sizeof(sa);
   memset (&sa, '\0', salen);
 
-  fd = accept (sock->fd, &sa, &salen);
-  if (0 > fd) return -1;
-  newsid = cnet_new ();
-  newsock = &socks[newsid];
-  newsock->fd = fd;
-  newsock->flags = CNET_CLIENT;
-  cnet_register (newsid, newsock, POLLIN|POLLERR|POLLHUP|POLLNVAL);
+  while (navailsocks) {
+    fd = accept (sock->fd, &sa, &salen);
+    if (0 > fd) break;
+    newsid = cnet_new ();
+    newsock = &socks[newsid];
+    newsock->fd = fd;
+    newsock->flags = CNET_CLIENT;
+    cnet_register (newsid, newsock, POLLIN|POLLERR|POLLHUP|POLLNVAL);
 
-  getnameinfo (&sa, salen, host, 40, serv, 6, NI_NUMERICHOST|NI_NUMERICSERV);
-  newsock->rhost = strdup (host);
-  newsock->rport = atoi (serv);
+    getnameinfo (&sa, salen, host, 40, serv, 6, NI_NUMERICHOST|NI_NUMERICSERV);
+    newsock->rhost = strdup (host);
+    newsock->rport = atoi (serv);
+  }
 
   return sock->handler->on_newclient (sid, sock->data, newsid, newsock->rhost, newsock->rport);
 }
