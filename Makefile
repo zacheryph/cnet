@@ -44,7 +44,7 @@ runtest: test
 	MallocGaurdEdges=1 MallocStackLogging=1 MallocPreScribble=1 MallocScribble=1 MallocErrorAbort=1 gdb ./server
 
 clean:
-	@rm -f *.o $(LIBNAME) server client
+	@rm -rf *.o $(LIBNAME) server client server.dSYM client.dSYM
 
 .c.o:
 	$(CC) $(CFLAGS) -c $<
