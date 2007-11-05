@@ -43,6 +43,7 @@
 #define CNET_DELETED  0x08
 #define CNET_CONNECT  0x10    /* socket is connecting */
 #define CNET_BLOCKED  0x20    /* write's will block   */
+#define CNET_LINEMODE 0x40
 
 typedef struct {
   int fd;
@@ -190,12 +191,43 @@ static int cnet_on_newclient (int sid, cnet_socket_t *sock)
 
 static int cnet_on_readable (int sid, cnet_socket_t *sock)
 {
-  char *buf;
-  int len, ret;
-  buf = calloc (1, 1024);
-  if (-1 == (len = read(sock->fd, buf, 1023))) return cnet_close(sid);
-  ret = sock->handler->on_read (sid, sock->data, buf, len);
-  free (buf);
+  char buf[1024], *beg, *end;
+  int len, ret = 0;
+
+  for (;;) {
+    if (-1 == (len = read(sock->fd, buf, 1024))) return cnet_close(sid);
+    sock->in_buf = sock->in_len ? realloc(sock->in_buf, sock->in_len+len+1) : calloc(1, len+1);
+    memcpy (sock->in_buf + sock->in_len, buf, len);
+    sock->in_len += len;
+    if (1024 > len) break;
+  }
+  sock->in_buf[sock->in_len] = '\0';
+
+  if (0 == (sock->flags & CNET_LINEMODE)) {
+    sock->handler->on_read (sid, sock->data, sock->in_buf, sock->in_len);
+    free (sock->in_buf);
+    sock->in_buf = NULL;
+    ret = sock->in_len;
+    sock->in_len = 0;
+    return ret;
+  }
+
+  for (end = sock->in_buf; NULL != (beg = strsep(&end, "\r\n"));) {
+    if (NULL == end)  break;
+    if ('\0' == *beg) continue;
+    sock->handler->on_read (sid, sock->data, beg, end-beg);
+    ret += end-beg;
+  }
+
+  if ('\0' == *beg) {
+    free (sock->in_buf);
+    sock->in_len = 0;
+  }
+  else {
+    sock->in_len -= (beg - sock->in_buf);
+    memmove (sock->in_buf, beg, sock->in_len);
+    sock->in_buf = realloc(sock->in_buf, sock->in_len);
+  }
   return ret;
 }
 
@@ -273,6 +305,7 @@ int cnet_close (int sid)
   free (sock->lhost);
   free (sock->rhost);
   if (sock->out_len) free (sock->out_buf);
+  if (sock->in_len) free (sock->in_buf);
   memset (sock, '\0', sizeof(*sock));
   sock->fd = -1;
   sock->flags = CNET_AVAIL;
@@ -360,6 +393,15 @@ int cnet_ip_type (const char *ip)
 int cnet_valid (int sid)
 {
   return cnet_fetch(sid) ? 1 : 0;
+}
+
+int cnet_linemode (int sid, int toggle)
+{
+  cnet_socket_t *sock;
+  if (NULL == (sock = cnet_fetch(sid))) return 0;
+  if (toggle) sock->flags |= CNET_LINEMODE;
+  else sock->flags &= ~(CNET_LINEMODE);
+  return 1;
 }
 
 int cnet_write (int sid, const char *data, int len)

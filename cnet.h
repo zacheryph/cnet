@@ -35,6 +35,7 @@ int cnet_close (int sid);
 int cnet_select (int timeout);
 int cnet_ip_type (const char *ip);
 int cnet_valid (int sid);
+int cnet_linemode (int sid, int toggle);
 int cnet_write (int sid, const char *data, int len);
 int cnprintf (int sid, const char *format, ...);
 cnet_handler_t *cnet_handler (int sid, cnet_handler_t *handler);
