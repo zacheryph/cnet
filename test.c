@@ -81,7 +81,10 @@ int main (const int argc, const char **argv)
 
   for (;;) {
     printf ("SERVER: calling cnet_select()\n");
-    cnet_select (5000);
+    if (-1 == cnet_select (5000)) {
+      printf ("SERVER: we are broken(%d): %s\n", errno, strerror(errno));
+      break;
+    };
   }
 
   return 0;

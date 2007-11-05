@@ -64,11 +64,10 @@ typedef struct {
 } cnet_socket_t;
 
 static cnet_socket_t *socks = NULL;
-static int nsocks = 0;
-static int navailsocks = 0;
 static struct pollfd *pollfds = NULL;
 static int *pollsids = NULL;
-static int npollfds;
+static int nsocks = 0;
+static int npollfds = 0;
 
 
 /*** private helper methods ***/
@@ -76,15 +75,17 @@ static int cnet_grow_sockets (void)
 {
   int i, newsocks;
   newsocks = (nsocks / 3) + 16;
-  printf ("growing socks: %d total: %d\n", newsocks, nsocks+newsocks);
   socks = realloc (socks, (nsocks+newsocks) * sizeof(*socks));
+  pollfds = realloc (pollfds, (nsocks+newsocks) * sizeof(*pollfds));
+  pollsids = realloc (pollsids, (nsocks+newsocks) * sizeof(*pollsids));
   memset(socks+nsocks, '\0', newsocks*sizeof(*socks));
+  memset (pollfds+newsocks, '\0', sizeof(*pollfds));
   for (i = 0; i < newsocks; i++) {
     socks[nsocks+i].fd = -1;
     socks[nsocks+i].flags = CNET_AVAIL;
   }
+
   nsocks += newsocks;
-  navailsocks += newsocks;
   return newsocks;
 }
 
@@ -127,15 +128,11 @@ static int cnet_register (int fd, int sockflags, int fdflags)
   for (sid = 0; sid < nsocks; sid++)
     if (socks[sid].flags & CNET_AVAIL) break;
   if (sid == nsocks) return -1;
-  navailsocks--;
   sock = &socks[sid];
   sock->fd = fd;
   sock->flags = sockflags;
 
   /* configure the fd */
-  pollfds = realloc (pollfds, (npollfds+1) * sizeof(*pollfds));
-  pollsids = realloc (pollsids, (npollfds+1) * sizeof(*pollsids));
-  memset (pollfds+npollfds, '\0', sizeof(*pollfds));
   pollfds[npollfds].fd = sock->fd;
   pollfds[npollfds].events = fdflags;
   pollsids[npollfds] = sid;
@@ -176,7 +173,7 @@ static int cnet_on_newclient (int sid, cnet_socket_t *sock)
   salen = sizeof(sa);
   memset (&sa, '\0', salen);
 
-  while (navailsocks) {
+  while (npollfds < nsocks) {
     fd = accept (sock->fd, &sa, &salen);
     if (0 > fd) break;
     accepted++;
@@ -269,9 +266,7 @@ int cnet_close (int sid)
     memcpy (&pollfds[i], &pollfds[npollfds], sizeof(*pollfds));
     pollsids[i] = pollsids[npollfds];
   }
-  pollfds = realloc (pollfds, npollfds * sizeof(*pollfds));
-  pollsids = realloc (pollsids, npollfds * sizeof(*pollsids));
-
+  memset (&pollfds[i], '\0', sizeof(*pollfds));
 
   close (sock->fd);
   if (sock->handler->on_close) sock->handler->on_close (sid, sock->data);
@@ -281,7 +276,6 @@ int cnet_close (int sid)
   memset (sock, '\0', sizeof(*sock));
   sock->fd = -1;
   sock->flags = CNET_AVAIL;
-  navailsocks++;
   return 0;
 }
 
@@ -330,7 +324,7 @@ int cnet_select (int timeout)
   active--;
 
   /* grow sockets if we must */
-  if (navailsocks < (nsocks / 3)) cnet_grow_sockets();
+  if (npollfds > nsocks - (nsocks / 3)) cnet_grow_sockets();
 
   return ret;
 }
