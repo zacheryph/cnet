@@ -62,6 +62,7 @@ int ts_on_newclient (int sid, void *conn_data, int newsid, char *host, int port)
 {
   printf ("SERVER: new_client sid:%d host:%s port:%d\n", newsid, host, port);
   cnet_handler (newsid, &testserver_handler);
+  cnet_linemode (newsid, 1);
   return 0;
 }
 
@@ -135,7 +136,7 @@ int main (const int argc, const char **argv)
   }
 
   for (i = 0; i < 4; i++) {
-    cnprintf (sid, "my formatted: %d --> %s\n", i, "Format String");
+    cnprintf (sid, "my formatted: %d --> %s\r\nOur second Info....\n", i, "Format String");
     cnet_select(2000);
     sleep (2);
   }
