@@ -55,8 +55,8 @@ typedef struct {
   int rport;
 
   /* buffer data */
-  char *buf;
-  int len;
+  char *in_buf, *out_buf;
+  int in_len, out_len;
 
   /* client data */
   cnet_handler_t *handler;
@@ -272,7 +272,7 @@ int cnet_close (int sid)
   if (sock->handler->on_close) sock->handler->on_close (sid, sock->data);
   free (sock->lhost);
   free (sock->rhost);
-  if (sock->len) free (sock->buf);
+  if (sock->out_len) free (sock->out_buf);
   memset (sock, '\0', sizeof(*sock));
   sock->fd = -1;
   sock->flags = CNET_AVAIL;
@@ -367,31 +367,31 @@ int cnet_write (int sid, const char *data, int len)
   int i;
   cnet_socket_t *sock;
   if (NULL == (sock = cnet_fetch(sid))) return -1;
-  if (0 >= len && !sock->len) return 0;
+  if (0 >= len && !sock->out_len) return 0;
 
   /* check if there is data that still needs to be written */
   if (len > 0) {
-    sock->buf = sock->len ? realloc(sock->buf, sock->len + len) : calloc(1, len);
-    memcpy (sock->buf + sock->len, data, len);
-    sock->len += len;
+    sock->out_buf = sock->out_len ? realloc(sock->out_buf, sock->out_len + len) : calloc(1, len);
+    memcpy (sock->out_buf + sock->out_len, data, len);
+    sock->out_len += len;
   }
 
   if (sock->flags & (CNET_BLOCKED|CNET_CONNECT)) return 0;
-  len = write (sock->fd, sock->buf, sock->len);
+  len = write (sock->fd, sock->out_buf, sock->out_len);
   if (0 > len && errno != EAGAIN) return cnet_on_eof (sid, sock, errno);
 
   for (i = 0; i < npollfds; i++)
     if (sock->fd == pollfds[i].fd) break;
 
-  if (len == sock->len) {
-    free (sock->buf);
-    sock->len = 0;
+  if (len == sock->out_len) {
+    free (sock->out_buf);
+    sock->out_len = 0;
     pollfds[i].events &= ~POLLOUT;
   }
   else {
-    memmove (sock->buf, sock->buf+len, sock->len-len);
-    sock->len -= len;
-    sock->buf = realloc (sock->buf, sock->len);
+    memmove (sock->out_buf, sock->out_buf+len, sock->out_len-len);
+    sock->out_len -= len;
+    sock->out_buf = realloc (sock->out_buf, sock->out_len);
 
     /* we need to set block since we still have data */
     sock->flags |= CNET_BLOCKED;
