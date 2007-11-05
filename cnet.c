@@ -65,28 +65,40 @@ typedef struct {
 
 static cnet_socket_t *socks = NULL;
 static int nsocks = 0;
+static int navailsocks = 0;
 static struct pollfd *pollfds = NULL;
 static int *pollsids = NULL;
 static int npollfds;
 
 
 /*** private helper methods ***/
+static int cnet_grow_sockets (void)
+{
+  int i, newsocks;
+  newsocks = (nsocks / 3) + 16;
+  printf ("growing socks: %d total: %d\n", newsocks, nsocks+newsocks);
+  socks = realloc (socks, (nsocks+newsocks) * sizeof(*socks));
+  memset(socks+nsocks, '\0', newsocks*sizeof(*socks));
+  for (i = 0; i < newsocks; i++) {
+    socks[nsocks+i].fd = -1;
+    socks[nsocks+i].flags = CNET_AVAIL;
+  }
+  nsocks += newsocks;
+  navailsocks += newsocks;
+  return newsocks;
+}
+
 static int cnet_new (void)
 {
-  int i, sid;
+  int sid;
 
+  if (0 == nsocks) cnet_grow_sockets();
   for (sid = 0; sid < nsocks; sid++)
     if (socks[sid].flags & CNET_AVAIL) break;
 
-  if (sid == nsocks) {
-    socks = realloc (socks, (nsocks+4) * sizeof(*socks));
-    memset (socks+nsocks, '\0', 4*sizeof(*socks));
-    for (i = 0; i < 4; i++) {
-      socks[nsocks+i].fd = -1;
-      socks[nsocks+i].flags = CNET_AVAIL;
-    }
-    nsocks += 4;
-  }
+  if (sid == nsocks) return -1;
+
+  navailsocks--;
   return sid;
 }
 
@@ -171,7 +183,6 @@ static int cnet_on_newclient (int sid, cnet_socket_t *sock)
   fd = accept (sock->fd, &sa, &salen);
   if (0 > fd) return -1;
   newsid = cnet_new ();
-  sock = &socks[sid];
   newsock = &socks[newsid];
   newsock->fd = fd;
   newsock->flags = CNET_CLIENT;
@@ -290,6 +301,7 @@ int cnet_close (int sid)
   memset (sock, '\0', sizeof(*sock));
   sock->fd = -1;
   sock->flags = CNET_AVAIL;
+  navailsocks++;
   return 0;
 }
 
@@ -322,7 +334,6 @@ int cnet_select (int timeout)
     if (p->revents & POLLIN) {
       if (sock->flags & CNET_SERVER) cnet_on_newclient (sid, sock);
       else cnet_on_readable (sid, sock);
-      sock = &socks[sid];
     }
     if (p->revents & POLLOUT) {
       p->events &= ~(POLLOUT);
@@ -337,6 +348,10 @@ int cnet_select (int timeout)
     if (!n) break;
   }
   active--;
+
+  /* grow sockets if we must */
+  if (navailsocks < (nsocks / 3)) cnet_grow_sockets();
+
   return ret;
 }
 
