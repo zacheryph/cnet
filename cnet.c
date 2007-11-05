@@ -141,6 +141,14 @@ static int cnet_register (int sid, int flags)
   return 0;
 }
 
+/* fetch the cnet_socket_t related to a sid if avail and not deleted */
+static cnet_socket_t *cnet_fetch (int sid)
+{
+  if (sid >= nsocks) return NULL;
+  if (socks[sid].flags & (CNET_AVAIL | CNET_DELETED)) return NULL;
+  return &socks[sid];
+}
+
 
 /*** connection handlers ***/
 static int cnet_on_connect (int sid)
@@ -267,8 +275,7 @@ int cnet_close (int sid)
 {
   int i;
   cnet_socket_t *sock;
-  if (!cnet_valid(sid)) return -1;
-  sock = &socks[sid];
+  if (NULL == (sock = cnet_fetch(sid))) return -1;
   if (0 > sock->fd) return -1;
 
   /* remove socket from pollfds is wise.... */
@@ -346,8 +353,7 @@ int cnet_select (int timeout)
 cnet_handler_t *cnet_handler (int sid, cnet_handler_t *handler)
 {
   cnet_socket_t *sock;
-  if (!cnet_valid(sid)) return NULL;
-  sock = &socks[sid];
+  if (NULL == (sock = cnet_fetch(sid))) return NULL;
   if (handler) sock->handler = handler;
   return sock->handler;
 }
@@ -355,8 +361,7 @@ cnet_handler_t *cnet_handler (int sid, cnet_handler_t *handler)
 void *cnet_conndata (int sid, void *conn_data)
 {
   cnet_socket_t *sock;
-  if (!cnet_valid(sid)) return NULL;
-  sock = &socks[sid];
+  if (NULL == (sock = cnet_fetch(sid))) return NULL;
   if (conn_data) sock->data = conn_data;
   return sock->data;
 }
@@ -373,17 +378,14 @@ int cnet_ip_type (const char *ip)
 /* is this a valid & connected sid ? */
 int cnet_valid (int sid)
 {
-  if (sid >= nsocks) return 0;
-  if (socks[sid].flags & (CNET_AVAIL | CNET_DELETED)) return 0;
-  return 1;
+  return cnet_fetch(sid) ? 1 : 0;
 }
 
 int cnet_write (int sid, const char *data, int len)
 {
   int i;
   cnet_socket_t *sock;
-  if (!cnet_valid(sid)) return -1;
-  sock = &socks[sid];
+  if (NULL == (sock = cnet_fetch(sid))) return -1;
   if (0 >= len && !sock->len) return 0;
 
   /* check if there is data that still needs to be written */
