@@ -102,12 +102,12 @@ static int cnet_new (void)
   return sid;
 }
 
-static int cnet_set_nonblock (int sid)
+static int cnet_set_nonblock (cnet_socket_t *sock)
 {
   int flags;
-  if (-1 == (flags = fcntl (socks[sid].fd, F_GETFL, 0))) return -1;
+  if (-1 == (flags = fcntl (sock->fd, F_GETFL, 0))) return -1;
   flags |= O_NONBLOCK;
-  fcntl (socks[sid].fd, F_SETFL, flags);
+  fcntl (sock->fd, F_SETFL, flags);
   return 0;
 }
 
@@ -223,7 +223,7 @@ int cnet_listen (const char *host, int port)
   if (-1 == (sid = cnet_new ())) return -1;
   sock = &socks[sid];
   if (-1 == (sock->fd = cnet_bind (host, port))) return -1;
-  cnet_set_nonblock (sid);
+  cnet_set_nonblock (sock);
   if (-1 == listen (sock->fd, 2)) goto cleanup;
   sock->flags = CNET_SERVER;
   cnet_register (sid, sock, POLLIN|POLLERR|POLLHUP|POLLNVAL);
@@ -256,7 +256,7 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
     getsockname (sock->fd, sa, NULL);
     hints.ai_family = sa->sa_family;
   }
-  cnet_set_nonblock (sid);
+  cnet_set_nonblock (sock);
 
   snprintf (port, 6, "%d", rport);
   if (getaddrinfo (rhost, port, &hints, &res)) goto cleanup;
