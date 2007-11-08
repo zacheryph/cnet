@@ -297,6 +297,7 @@ int cnet_close (int sid)
   if (sock->poll < npollfds) {
     memcpy (&pollfds[sock->poll], &pollfds[npollfds], sizeof(*pollfds));
     pollsids[sock->poll] = pollsids[npollfds];
+    socks[pollsids[sock->poll]].poll = sock->poll;
   }
   memset (&pollfds[npollfds], '\0', sizeof(*pollfds));
 
