@@ -21,6 +21,10 @@
 #ifndef CONTEXT_NET_H_
 #define CONTEXT_NET_H_
 
+#ifndef __GNUC__
+# define __attribute__(x) /* NOTHING */
+#endif
+
 typedef struct {
   int (*on_connect) (int sid, void *conn_data);
   int (*on_read) (int sid, void *conn_data, char *data, int len);
@@ -37,7 +41,7 @@ int cnet_ip_type (const char *ip);
 int cnet_valid (int sid);
 int cnet_linemode (int sid, int toggle);
 int cnet_write (int sid, const char *data, int len);
-int cnprintf (int sid, const char *format, ...);
+int cnprintf (int sid, const char *format, ...) __attribute__((format(printf,2,3)));
 cnet_handler_t *cnet_handler (int sid, cnet_handler_t *handler);
 void *cnet_conndata (int sid, void *conn_data);
 
