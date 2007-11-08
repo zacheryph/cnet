@@ -287,7 +287,6 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
 
 int cnet_close (int sid)
 {
-  int i;
   cnet_socket_t *sock;
   if (NULL == (sock = cnet_fetch(sid))) return -1;
   if (0 > sock->fd) return -1;
@@ -410,7 +409,7 @@ int cnet_linemode (int sid, int toggle)
 
 int cnet_write (int sid, const void *data, int len)
 {
-  int i, written = 0, ret = 0;
+  int written = 0, ret = 0;
   cnet_socket_t *sock;
   if (NULL == (sock = cnet_fetch(sid))) return -1;
   if (0 >= len && !sock->out_len) return 0;
