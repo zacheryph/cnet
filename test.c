@@ -41,14 +41,12 @@ cnet_handler_t testserver_handler = {
 
 int ts_on_read (int sid, void *conn_data, char *data, int len)
 {
-  printf ("SERVER: on_read sid:%d len:%d --> %s\n", sid, len, data);
   cnprintf (sid, "From SERVER: Got your Message !\n");
   return 0;
 }
 
 int ts_on_eof (int sid, void *conn_data, int err)
 {
-  printf ("SERVER: on_eof sid:%d\n", sid);
   return 0;
 }
 
@@ -60,7 +58,7 @@ int ts_on_close (int sid, void *conn_data)
 
 int ts_on_newclient (int sid, void *conn_data, int newsid, char *host, int port)
 {
-  printf ("SERVER: new_client sid:%d host:%s port:%d\n", newsid, host, port);
+  printf ("SERVER: new_client sid:%d\n", newsid);
   cnet_handler (newsid, &testserver_handler);
   cnet_linemode (newsid, 1);
   return 0;
@@ -68,7 +66,7 @@ int ts_on_newclient (int sid, void *conn_data, int newsid, char *host, int port)
 
 int main (const int argc, const char **argv)
 {
-  int ssid;
+  int ssid, ret;
   ssid = cnet_listen (TESTSERVER_HOST, TESTSERVER_PORT);
   if (-1 == ssid) {
     printf ("SERVER: ERROR failed to connect errno:%d\n", errno);
@@ -81,8 +79,8 @@ int main (const int argc, const char **argv)
   printf ("SERVER: started server sid:%d\n", ssid);
 
   for (;;) {
-    printf ("SERVER: calling cnet_select()\n");
-    if (-1 == cnet_select (5000)) {
+    ret = cnet_select (5000);
+    if (-1 == ret) {
       printf ("SERVER: we are broken(%d): %s\n", errno, strerror(errno));
       break;
     };
@@ -103,13 +101,11 @@ int tc_on_connect (int sid, void *conn_data)
 
 int tc_on_read (int sid, void *conn_data, char *data, int len)
 {
-  printf ("CLIENT: on_read sid:%d len:%d --> %s\n", sid, len, data);
   return 0;
 }
 
 int tc_on_eof (int sid, void *conn_data, int err)
 {
-  printf ("CLIENT: on_eof sid:%d\n", sid);
   return 0;
 }
 
@@ -138,7 +134,6 @@ int main (const int argc, const char **argv)
   for (i = 0; i < 4; i++) {
     cnprintf (sid, "my formatted: %d --> %s\r\nOur second Info....\n", i, "Format String");
     cnet_select(2000);
-    sleep (2);
   }
   cnet_close (sid);
 

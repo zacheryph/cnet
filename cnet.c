@@ -298,7 +298,7 @@ int cnet_close (int sid)
     memcpy (&pollfds[i], &pollfds[npollfds], sizeof(*pollfds));
     pollsids[i] = pollsids[npollfds];
   }
-  memset (&pollfds[i], '\0', sizeof(*pollfds));
+  memset (&pollfds[npollfds], '\0', sizeof(*pollfds));
 
   close (sock->fd);
   if (sock->handler->on_close) sock->handler->on_close (sid, sock->data);
@@ -346,9 +346,12 @@ int cnet_select (int timeout)
       p->events &= ~(POLLOUT);
       if (sock->flags & CNET_CONNECT) {
         cnet_on_connect (sid, sock);
-        socks->flags &= ~CNET_BLOCKED;
+        socks->flags &= ~CNET_CONNECT;
       }
-      if (sock->flags & CNET_BLOCKED) cnet_write (sid, NULL, 0);
+      if (sock->flags & CNET_BLOCKED) {
+        sock->flags &= ~CNET_BLOCKED;
+        cnet_write (sid, NULL, 0);
+      }
     }
 
     n--;
@@ -428,7 +431,6 @@ int cnet_write (int sid, const char *data, int len)
   if (len == sock->out_len) {
     free (sock->out_buf);
     sock->out_len = 0;
-    pollfds[i].events &= ~POLLOUT;
   }
   else {
     memmove (sock->out_buf, sock->out_buf+len, sock->out_len-len);

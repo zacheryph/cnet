@@ -21,8 +21,8 @@ CC = gcc
 OBJS = cnet.o
 SRCS = cnet.c
 CFLAGS = -W -Wextra -Wall -pedantic -fPIC -g3
-TSFLAGS = -DTESTSERVER -o server test.c
-TCFLAGS = -DTESTCLIENT -o client test.c
+TSFLAGS = -DTESTSERVER -o server
+TCFLAGS = -DTESTCLIENT -o client
 T_LDFLAGS = -Wno-unused-parameter -L. -lcnet
 OS := $(shell uname -s)
 ifeq ($(OS), Darwin)
@@ -37,8 +37,12 @@ default: $(OBJS)
 	$(CC) $(LDFLAGS) -o $(LIBNAME) $(OBJS)
 
 test: default
-	$(CC) $(CFLAGS) $(T_LDFLAGS) $(TSFLAGS)
-	$(CC) $(CFLAGS) $(T_LDFLAGS) $(TCFLAGS)
+	$(CC) $(CFLAGS) $(T_LDFLAGS) $(TSFLAGS) test.c
+	$(CC) $(CFLAGS) $(T_LDFLAGS) $(TCFLAGS) test.c
+
+bintest: default
+	$(CC) $(CFLAGS) $(T_LDFLAGS) $(TSFLAGS) binary_test.c
+	$(CC) $(CFLAGS) $(T_LDFLAGS) $(TCFLAGS) binary_test.c
 
 runtest: test
 	MallocGaurdEdges=1 MallocStackLogging=1 MallocPreScribble=1 MallocScribble=1 MallocErrorAbort=1 gdb ./server
