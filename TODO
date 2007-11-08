@@ -1,10 +1,6 @@
 * socket stats
-* filters (linemode, ssl = cssl?)
-* cnet_close: eof/close callbacks
 * cleanup _bind/_connect so you dont need to getsockname();
 * make block/nonblock an option? (do i really want this)
 * acl for listening sockets? (bloat?)
 * on_written callback?
 * fix cnet_write to only malloc/memcpy when needed.
-* use socket_t pointer internally to prevent lookups where possible
-* rework cnet_new/socks alloc to not require sock=& resets.
