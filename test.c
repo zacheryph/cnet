@@ -22,11 +22,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <unistd.h>
 #include "cnet.h"
 
 #define TESTSERVER_HOST "127.0.0.1"
 #define TESTSERVER_PORT 64930
+
+void sigpipe_handler (int err) {
+  printf ("DEBUG: recieved a SIGPIPE!!!\n");
+}
 
 /* test server: echo's anything it recieves to client & output */
 #ifdef TESTSERVER
@@ -67,6 +72,9 @@ int ts_on_newclient (int sid, void *conn_data, int newsid, char *host, int port)
 int main (const int argc, const char **argv)
 {
   int ssid, ret;
+
+  signal (SIGPIPE, sigpipe_handler);
+
   ssid = cnet_listen (TESTSERVER_HOST, TESTSERVER_PORT);
   if (-1 == ssid) {
     printf ("SERVER: ERROR failed to connect errno:%d\n", errno);
@@ -131,9 +139,10 @@ int main (const int argc, const char **argv)
     return 0;
   }
 
-  for (i = 0; i < 4; i++) {
+  for (i = 0; i < 2; i++) {
     cnprintf (sid, "my formatted: %d --> %s\r\nOur second Info....\n", i, "Format String");
     cnet_select(2000);
+    sleep(1);
   }
   cnet_close (sid);
 
