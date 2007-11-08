@@ -407,41 +407,32 @@ int cnet_linemode (int sid, int toggle)
   return 1;
 }
 
-int cnet_write (int sid, const char *data, int len)
+int cnet_write (int sid, const void *data, int len)
 {
-  int i;
+  int i, written = 0, ret = 0;
   cnet_socket_t *sock;
   if (NULL == (sock = cnet_fetch(sid))) return -1;
   if (0 >= len && !sock->out_len) return 0;
+  if (sock->flags & (CNET_BLOCKED|CNET_CONNECT)) goto buffer;
 
-  /* check if there is data that still needs to be written */
-  if (len > 0) {
-    sock->out_buf = sock->out_len ? realloc(sock->out_buf, sock->out_len + len) : calloc(1, len);
-    memcpy (sock->out_buf + sock->out_len, data, len);
-    sock->out_len += len;
-  }
-
-  if (sock->flags & (CNET_BLOCKED|CNET_CONNECT)) return 0;
-  len = write (sock->fd, sock->out_buf, sock->out_len);
-  if (0 > len && errno != EAGAIN) return cnet_on_eof (sid, sock, errno);
-
-  for (i = 0; i < npollfds; i++)
-    if (sock->fd == pollfds[i].fd) break;
-
-  if (len == sock->out_len) {
+  if (sock->out_len) {
+    if (sock->out_len != (written = write(sock->fd, sock->out_buf, sock->out_len))) goto buffer;
     free (sock->out_buf);
     sock->out_len = 0;
   }
-  else {
-    memmove (sock->out_buf, sock->out_buf+len, sock->out_len-len);
-    sock->out_len -= len;
-    sock->out_buf = realloc (sock->out_buf, sock->out_len);
+  if (len == (ret = write(sock->fd, data, len))) return ret+written;
 
-    /* we need to set block since we still have data */
-    sock->flags |= CNET_BLOCKED;
+  buffer:
+    for (i = 0; i < npollfds; i++)
+      if (sock->fd == pollfds[i].fd) break;
     pollfds[i].events |= POLLOUT;
-  }
-  return len;
+    sock->flags |= CNET_BLOCKED;
+
+    if (sock->out_len) memmove(sock->out_buf, sock->out_buf + written, sock->out_len - written);
+    sock->out_buf = realloc(sock->out_buf, (sock->out_len - written) + (len - ret));
+    memcpy(sock->out_buf+(sock->out_len-written), data, len);
+    sock->out_len = (sock->out_len - written) + (len - ret);
+    return written + ret;
 }
 
 int cnprintf (int sid, const char *format, ...)
