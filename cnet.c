@@ -47,6 +47,7 @@
 
 typedef struct {
   int fd;
+  int poll;
   int flags;
 
   /* connection information */
@@ -132,6 +133,7 @@ static int cnet_register (int fd, int sockflags, int fdflags)
   sock = &socks[sid];
   sock->fd = fd;
   sock->flags = sockflags;
+  sock->poll = npollfds;
 
   /* configure the fd */
   pollfds[npollfds].fd = sock->fd;
@@ -291,12 +293,10 @@ int cnet_close (int sid)
   if (0 > sock->fd) return -1;
 
   /* remove socket from pollfds is wise.... */
-  for (i = 0; i < npollfds; i++)
-    if (sock->fd == pollfds[i].fd) break;
   npollfds--;
-  if (i < npollfds) {
-    memcpy (&pollfds[i], &pollfds[npollfds], sizeof(*pollfds));
-    pollsids[i] = pollsids[npollfds];
+  if (sock->poll < npollfds) {
+    memcpy (&pollfds[sock->poll], &pollfds[npollfds], sizeof(*pollfds));
+    pollsids[sock->poll] = pollsids[npollfds];
   }
   memset (&pollfds[npollfds], '\0', sizeof(*pollfds));
 
@@ -423,9 +423,7 @@ int cnet_write (int sid, const void *data, int len)
   if (len == (ret = write(sock->fd, data, len))) return ret+written;
 
   buffer:
-    for (i = 0; i < npollfds; i++)
-      if (sock->fd == pollfds[i].fd) break;
-    pollfds[i].events |= POLLOUT;
+    pollfds[sock->poll].events |= POLLOUT;
     sock->flags |= CNET_BLOCKED;
 
     if (sock->out_len) memmove(sock->out_buf, sock->out_buf + written, sock->out_len - written);
