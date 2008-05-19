@@ -251,7 +251,7 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
 {
   int salen, fd, ret;
   char port[6];
-  struct sockaddr *sa;
+  struct sockaddr lsa, *rsa;
   struct addrinfo hints, *res = NULL;
 
   memset (&hints, '\0', sizeof(hints));
@@ -260,16 +260,16 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
 
   /* if we have lhost we need to get hints for connect */
   if (lhost) {
-    getsockname (fd, sa, NULL);
-    hints.ai_family = sa->sa_family;
+    getsockname (fd, &lsa, NULL);
+    hints.ai_family = lsa.sa_family;
   }
 
   snprintf (port, 6, "%d", rport);
   if (getaddrinfo (rhost, port, &hints, &res)) goto cleanup;
-  sa = res->ai_addr;
+  rsa = res->ai_addr;
   salen = res->ai_addrlen;
 
-  ret = connect (fd, sa, sizeof(*sa));
+  ret = connect (fd, rsa, sizeof(*rsa));
   if (-1 == ret && EINPROGRESS != errno) goto cleanup;
   return cnet_register (fd, CNET_CLIENT|CNET_CONNECT, POLLIN|POLLOUT|POLLERR|POLLHUP|POLLNVAL);
 
