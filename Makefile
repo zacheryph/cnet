@@ -20,7 +20,7 @@
 CC = gcc
 OBJS = cnet.o
 SRCS = cnet.c
-CFLAGS = -W -Wextra -Wall -Wstrict-aliasing -pedantic -fPIC -g3 -O2
+CFLAGS = -W -Wextra -Wall -Wstrict-aliasing -pedantic -fPIC -g3 -O2 -D_XOPEN_SOURCE=500
 TSFLAGS = -DTESTSERVER -o server
 TCFLAGS = -DTESTCLIENT -o client
 T_LDFLAGS = -Wno-unused-parameter -L. -lcnet
