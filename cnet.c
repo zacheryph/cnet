@@ -434,7 +434,8 @@ int cnprintf (int sid, const char *format, ...)
   int len, ret;
 
   va_start (args, format);
-  if (-1 == (len = vasprintf (&data, format, args))) return -1;
+  data = malloc(512);
+  if (-1 == (len = vsnprintf (data, 512, format, args))) return -1;
   va_end (args);
   ret = cnet_write (sid, data, len);
   free (data);
