@@ -66,7 +66,6 @@ static int nsocks = 0;
 static int npollfds = 0;
 
 
-/*** private helper methods ***/
 static int cnet_grow_sockets (void)
 {
   int i, newsocks;
@@ -208,14 +207,16 @@ static int cnet_on_readable (int sid, cnet_socket_t *sock)
     return ret;
   }
 
-  for (end = sock->in_buf; NULL != (beg = strsep(&end, "\r\n"));) {
-    if (NULL == end)  break;
-    if ('\0' == *beg) continue;
+  beg = sock->in_buf;
+  while (*beg) {
+    end = beg + strcspn(beg, "\r\n");
+    if (!*end) break;
+    *end++ = '\0';
     sock->handler->on_read (sid, sock->data, beg, end-beg);
-    ret += end-beg;
+    beg = end + strspn(end, "\r\n");
   }
 
-  if ('\0' == *beg) {
+  if (!*beg) {
     free (sock->in_buf);
     sock->in_len = 0;
   }
