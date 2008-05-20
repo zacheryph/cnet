@@ -426,18 +426,21 @@ int cnet_write (int sid, const void *data, int len)
   if (0 >= len && !sock->out_len) return 0;
   if (sock->flags & (CNET_BLOCKED|CNET_CONNECT)) goto buffer;
 
-  if (sock->out_len) {
+  if (sock->out_len)
     if (sock->out_len != (written = write(sock->fd, sock->out_buf, sock->out_len))) goto buffer;
-    free (sock->out_buf);
+
+  if (len == (ret = write(sock->fd, data, len))) {
+    free(sock->out_buf);
     sock->out_len = 0;
+    return ret+written;
   }
-  if (len == (ret = write(sock->fd, data, len))) return ret+written;
 
   buffer:
     pollfds[sock->poll].events |= POLLOUT;
     sock->flags |= CNET_BLOCKED;
 
-    if (sock->out_len) memmove(sock->out_buf, sock->out_buf + written, sock->out_len - written);
+    if (sock->out_len && sock->out_len > written)
+      memmove(sock->out_buf, sock->out_buf + written, sock->out_len - written);
     sock->out_buf = realloc(sock->out_buf, (sock->out_len - written) + (len - ret));
     memcpy(sock->out_buf+(sock->out_len-written), data, len);
     sock->out_len = (sock->out_len - written) + (len - ret);
