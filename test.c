@@ -46,6 +46,7 @@ cnet_handler_t testserver_handler = {
 
 int ts_on_read (int sid, void *conn_data, char *data, int len)
 {
+  printf ("recieved: -- %s --\n", data);
   cnprintf (sid, "From SERVER: Got your Message !\n");
   return 0;
 }
