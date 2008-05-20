@@ -68,11 +68,27 @@ static int npollfds = 0;
 
 static int cnet_grow_sockets (void)
 {
+  char *tmp;
   int i, newsocks;
   newsocks = (nsocks / 3) + 16;
-  socks = realloc (socks, (nsocks+newsocks) * sizeof(*socks));
-  pollfds = realloc (pollfds, (nsocks+newsocks) * sizeof(*pollfds));
-  pollsids = realloc (pollsids, (nsocks+newsocks) * sizeof(*pollsids));
+  if (NULL == (tmp = realloc (socks, (nsocks+newsocks) * sizeof(*socks)))) {
+    fprintf(stderr, "ERROR: Failed to allocate memory to grow sockets (cnet_grow_sockets:socks)\n")
+    return -1;
+  }
+  socks = tmp;
+
+  if (NULL == (tmp = realloc (pollfds, (nsocks+newsocks) * sizeof(*pollfds)))) {
+    fprintf(stderr, "ERROR: Failed to allocate memory to grow sockets (cnet_grow_sockets:pollfds)\n")
+    return -1;
+  }
+  pollfds = tmp;
+
+  if (NULL == (tmp = realloc (pollsids, (nsocks+newsocks) * sizeof(*pollsids)))) {
+    fprintf(stderr, "ERROR: Failed to allocate memory to grow sockets (cnet_grow_sockets:pollsids)\n")
+    return -1;
+  }
+  pollsids = tmp;
+
   memset(socks+nsocks, '\0', newsocks*sizeof(*socks));
   memset (pollfds+newsocks, '\0', sizeof(*pollfds));
   for (i = 0; i < newsocks; i++) {
