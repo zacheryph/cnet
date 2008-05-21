@@ -202,45 +202,61 @@ static int cnet_on_newclient (int sid, cnet_socket_t *sock)
 
 static int cnet_on_readable (int sid, cnet_socket_t *sock)
 {
-  char buf[1024], *beg, *end;
-  int len, ret = 0;
+  char buf[1025], *beg, *end;
+  int len, sub = 0, ret = 0;
+
+  if (sock->in_len) {
+    memmove(buf, sock->in_buf, sock->in_len);
+    beg = buf + sock->in_len;
+    sub = sock->in_len;
+  }
+  else beg = buf;
 
   for (;;) {
-    if (-1 == (len = read(sock->fd, buf, 1024))) return cnet_close(sid);
-    sock->in_buf = sock->in_len ? realloc(sock->in_buf, sock->in_len+len+1) : calloc(1, len+1);
-    memcpy (sock->in_buf + sock->in_len, buf, len);
-    sock->in_len += len;
-    if (1024 > len) break;
-  }
-  sock->in_buf[sock->in_len] = '\0';
+    if (-1 == (len = sub + read(sock->fd, beg, 1024 - sub))) return cnet_close(sid);
+    sub = 0;
 
-  if (0 == (sock->flags & CNET_LINEMODE)) {
-    sock->handler->on_read (sid, sock->data, sock->in_buf, sock->in_len);
-    free (sock->in_buf);
-    sock->in_buf = NULL;
-    ret = sock->in_len;
-    sock->in_len = 0;
-    return ret;
+    if (0 == (sock->flags & CNET_LINEMODE)) {
+      sock->handler->on_read (sid, sock->data, buf, len);
+      ret += len;
+      if (1024 == len) continue;
+      return ret;
+    }
+
+    /* linemode processing */
+    buf[1024] = '\0';
+    beg = buf;
+
+    while (*beg) {
+      end = beg + strcspn(beg, "\r\n");
+
+      if (!*end && 1024 <= len) {
+        sock->handler->on_read (sid, sock->data, beg, end-beg);
+        ret++;
+        continue;
+      }
+      if (!*end) break;
+
+      ret++;
+      *end++ = '\0';
+      sock->handler->on_read (sid, sock->data, beg, end-beg);
+      beg = end + strspn(end, "\r\n");
+    }
+
+    if (!*beg && 1024 == len) {
+      sub = 1024 - (beg-buf);
+      memmove(buf, beg, sub);
+      beg = buf + sub;
+      continue;
+    }
+    break;
   }
 
-  beg = sock->in_buf;
-  while (*beg) {
-    end = beg + strcspn(beg, "\r\n");
-    if (!*end) break;
-    *end++ = '\0';
-    sock->handler->on_read (sid, sock->data, beg, end-beg);
-    beg = end + strspn(end, "\r\n");
-  }
+  if (!*beg) return ret;
 
-  if (!*beg) {
-    free (sock->in_buf);
-    sock->in_len = 0;
-  }
-  else {
-    sock->in_len -= (beg - sock->in_buf);
-    memmove (sock->in_buf, beg, sock->in_len);
-    sock->in_buf = realloc(sock->in_buf, sock->in_len);
-  }
+  sock->in_len = len - (beg - buf);
+  sock->in_buf = realloc(sock->in_buf, sock->in_len);
+  memmove(sock->in_buf, beg, sock->in_len);
   return ret;
 }
 
@@ -430,7 +446,7 @@ int cnet_write (int sid, const void *data, int len)
     if (sock->out_len != (written = write(sock->fd, sock->out_buf, sock->out_len))) goto buffer;
 
   if (len == (ret = write(sock->fd, data, len))) {
-    free(sock->out_buf);
+    if (sock->out_len) free(sock->out_buf);
     sock->out_len = 0;
     return ret+written;
   }
