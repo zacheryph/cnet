@@ -224,7 +224,7 @@ static int cnet_on_readable (int sid, cnet_socket_t *sock)
     }
 
     /* linemode processing */
-    buf[1024] = '\0';
+    buf[len] = '\0';
     beg = buf;
 
     while (*beg) {
@@ -233,7 +233,6 @@ static int cnet_on_readable (int sid, cnet_socket_t *sock)
       if (!*end && 1024 <= len) {
         sock->handler->on_read (sid, sock->data, beg, end-beg);
         ret++;
-        continue;
       }
       if (!*end) break;
 
@@ -252,7 +251,11 @@ static int cnet_on_readable (int sid, cnet_socket_t *sock)
     break;
   }
 
-  if (!*beg) return ret;
+  if (!*beg) {
+		if (sock->in_len) free(sock->in_buf);
+		sock->in_len = 0;
+		return ret;
+	}
 
   sock->in_len = len - (beg - buf);
   sock->in_buf = realloc(sock->in_buf, sock->in_len);

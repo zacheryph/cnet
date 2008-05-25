@@ -44,7 +44,7 @@ bintest: default
 	$(CC) $(CFLAGS) $(T_LDFLAGS) $(TCFLAGS) binary_test.c
 
 runtest: test
-	MallocGaurdEdges=1 MallocStackLogging=1 MallocPreScribble=1 MallocScribble=1 MallocErrorAbort=1 gdb ./server
+	MallocGuardEdges=1 MallocStackLogging=1 MallocPreScribble=1 MallocScribble=1 MallocErrorAbort=1 gdb ./server
 
 clean:
 	@rm -rf *.o $(LIBNAME) server client server.dSYM client.dSYM
