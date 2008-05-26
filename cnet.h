@@ -27,6 +27,7 @@ typedef struct {
   int (*on_newclient) (int sid, void *conn_data, int newsid, char *host, int port);
 } cnet_handler_t;
 
+int cnet_register (int fd);
 int cnet_listen (const char *host, int port);
 int cnet_connect (const char *rhost, int rport, const char *lhost, int lport);
 int cnet_close (int sid);

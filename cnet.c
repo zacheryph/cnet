@@ -129,7 +129,7 @@ static int cnet_bind (const char *host, int port)
 }
 
 /* create a sid / configure fd */
-static int cnet_register (int fd, int sockflags, int fdflags)
+static int cnet_register_raw (int fd, int sockflags, int fdflags)
 {
   int sid, flags;
   cnet_socket_t *sock;
@@ -189,7 +189,7 @@ static int cnet_on_newclient (int sid, cnet_socket_t *sock)
     fd = accept (sock->fd, &sa, &salen);
     if (0 > fd) break;
     accepted++;
-    newsid = cnet_register (fd, CNET_CLIENT, POLLIN|POLLERR|POLLHUP|POLLNVAL);
+    newsid = cnet_register_raw (fd, CNET_CLIENT, POLLIN|POLLERR|POLLHUP|POLLNVAL);
     newsock = &socks[newsid];
 
     getnameinfo (&sa, salen, host, 40, serv, 6, NI_NUMERICHOST|NI_NUMERICSERV);
@@ -271,6 +271,11 @@ static int cnet_on_eof (int sid, cnet_socket_t *sock, int err)
 
 
 /*** public functions ***/
+int cnet_register (int fd)
+{
+	return cnet_register_raw(fd, CNET_CLIENT, POLLIN|POLLOUT|POLLERR|POLLHUP|POLLNVAL);
+}
+
 int cnet_listen (const char *host, int port)
 {
   int fd;
@@ -280,7 +285,7 @@ int cnet_listen (const char *host, int port)
     close (fd);
     return -1;
   }
-  return cnet_register (fd, CNET_SERVER, POLLIN|POLLERR|POLLHUP|POLLNVAL);
+  return cnet_register_raw (fd, CNET_SERVER, POLLIN|POLLERR|POLLHUP|POLLNVAL);
 }
 
 int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
@@ -307,7 +312,7 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
 
   ret = connect (fd, rsa, sizeof(*rsa));
   if (-1 == ret && EINPROGRESS != errno) goto cleanup;
-  return cnet_register (fd, CNET_CLIENT|CNET_CONNECT, POLLIN|POLLOUT|POLLERR|POLLHUP|POLLNVAL);
+  return cnet_register_raw (fd, CNET_CLIENT|CNET_CONNECT, POLLIN|POLLOUT|POLLERR|POLLHUP|POLLNVAL);
 
   cleanup:
     close (fd);
