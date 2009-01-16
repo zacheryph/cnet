@@ -118,13 +118,12 @@ static int cnet_bind (const char *host, int port)
   if (getaddrinfo (host, (port ? strport : NULL), &hints, &res)) return -1;
   sa = res->ai_addr;
   salen = res->ai_addrlen;
+  freeaddrinfo (res);
 
   if (-1 == bind (fd, sa, sizeof(*sa))) {
     close (fd);
     fd = -1;
   }
-
-  freeaddrinfo (res);
   return fd;
 }
 
@@ -312,6 +311,7 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
 
   ret = connect (fd, rsa, sizeof(*rsa));
   if (-1 == ret && EINPROGRESS != errno) goto cleanup;
+  freeaddrinfo (res);
   return cnet_register_raw (fd, CNET_CLIENT|CNET_CONNECT, POLLIN|POLLOUT|POLLERR|POLLHUP|POLLNVAL);
 
   cleanup:
