@@ -7,5 +7,4 @@
 * check return on system calls (socket)
 * use unsigned where called for
 * use sprintf for itoa (faster)
-* rewrite on_newclient to accept so many at a time (prevent ddos/socket starvation)
 * rewrite on_readable (to long, and linemode possibly completely busted, starvation)

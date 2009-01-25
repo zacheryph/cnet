@@ -176,7 +176,7 @@ static int cnet_on_connect (int sid, cnet_socket_t *sock)
 
 static int cnet_on_newclient (int sid, cnet_socket_t *sock)
 {
-  int fd, newsid, accepted = 0;
+  int fd, newsid, accepted;
   char host[40], serv[6];
   socklen_t salen;
   cnet_socket_t *newsock;
@@ -184,10 +184,9 @@ static int cnet_on_newclient (int sid, cnet_socket_t *sock)
   salen = sizeof(sa);
   memset (&sa, '\0', salen);
 
-  while (npollfds < nsocks) {
+  for (accepted = 0; accepted < 3 && npollfds < nsocks; accepted++) {
     fd = accept (sock->fd, &sa, &salen);
     if (0 > fd) break;
-    accepted++;
     newsid = cnet_register_raw (fd, CNET_CLIENT, POLLIN|POLLERR|POLLHUP|POLLNVAL);
     newsock = &socks[newsid];
 
