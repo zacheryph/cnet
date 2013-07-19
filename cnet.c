@@ -103,7 +103,7 @@ static int cnet_grow_sockets (void)
 /* returns fd. NOT sid */
 static int cnet_bind (const char *host, int port)
 {
-  int salen, fd;
+  int fd;
   char strport[6];
   struct sockaddr *sa;
   struct addrinfo hints, *res = NULL;
@@ -117,7 +117,6 @@ static int cnet_bind (const char *host, int port)
   if (port) snprintf (strport, 6, "%d", port);
   if (getaddrinfo (host, (port ? strport : NULL), &hints, &res)) return -1;
   sa = res->ai_addr;
-  salen = res->ai_addrlen;
   freeaddrinfo (res);
 
   if (-1 == bind (fd, sa, sizeof(*sa))) {
@@ -288,7 +287,7 @@ int cnet_listen (const char *host, int port)
 
 int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
 {
-  int salen, fd, ret;
+  int fd, ret;
   char port[6];
   struct sockaddr lsa, *rsa;
   struct addrinfo hints, *res = NULL;
@@ -306,7 +305,6 @@ int cnet_connect (const char *rhost, int rport, const char *lhost, int lport)
   snprintf (port, 6, "%d", rport);
   if (getaddrinfo (rhost, port, &hints, &res)) goto cleanup;
   rsa = res->ai_addr;
-  salen = res->ai_addrlen;
 
   ret = connect (fd, rsa, sizeof(*rsa));
   if (-1 == ret && EINPROGRESS != errno) goto cleanup;
