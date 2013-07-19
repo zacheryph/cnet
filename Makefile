@@ -20,7 +20,7 @@
 CC = gcc
 OBJS = cnet.o
 SRCS = cnet.c
-CFLAGS = -W -Wextra -Wall -Wstrict-aliasing -pedantic -fPIC -g -D_XOPEN_SOURCE=500
+CFLAGS = -W -Wextra -Wall -Wstrict-aliasing -pedantic -fPIC -g -D_XOPEN_SOURCE=500 -std=c99
 TSFLAGS = -DTESTSERVER -o server
 TCFLAGS = -DTESTCLIENT -o client
 OS := $(shell uname -s)
